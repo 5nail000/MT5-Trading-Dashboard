@@ -1,0 +1,145 @@
+/* Custom CSS for MT5 Trading Dashboard */
+
+/* Toast notifications */
+div.stToast {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    width: auto;
+    max-width: 80%;
+}
+
+div.stToast > div {
+    background-color: #28a745;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+
+/* Main container */
+.main .block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
+/* Sidebar styling */
+.sidebar .sidebar-content {
+    background-color: #f8f9fa;
+}
+
+/* Metric cards */
+.metric-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1rem;
+    border-radius: 10px;
+    margin: 0.5rem 0;
+}
+
+/* Chart containers */
+.chart-container {
+    background-color: white;
+    border-radius: 10px;
+    padding: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin: 1rem 0;
+}
+
+/* Data tables */
+.data-table {
+    background-color: white;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Status indicators */
+.status-positive {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.status-negative {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.status-warning {
+    color: #ffc107;
+    font-weight: bold;
+}
+
+/* Buttons */
+.stButton > button {
+    background-color: #007bff;
+    color: white;
+    border-radius: 5px;
+    border: none;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.stButton > button:hover {
+    background-color: #0056b3;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+/* Selectbox styling */
+.stSelectbox > div > div {
+    background-color: white;
+    border-radius: 5px;
+    border: 1px solid #ced4da;
+}
+
+/* Date input styling */
+.stDateInput > div > div > input {
+    background-color: white;
+    border-radius: 5px;
+    border: 1px solid #ced4da;
+}
+
+/* Expander styling */
+.streamlit-expanderHeader {
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    border: 1px solid #dee2e6;
+}
+
+/* Tab styling */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 2px;
+}
+
+.stTabs [data-baseweb="tab"] {
+    background-color: #f8f9fa;
+    border-radius: 5px 5px 0 0;
+    border: 1px solid #dee2e6;
+    border-bottom: none;
+}
+
+.stTabs [aria-selected="true"] {
+    background-color: white;
+    border-bottom: 1px solid white;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .main .block-container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    .metric-card {
+        margin: 0.25rem 0;
+        padding: 0.75rem;
+    }
+    
+    .chart-container {
+        padding: 0.5rem;
+    }
+}
