@@ -165,12 +165,38 @@ This version includes several important bug fixes:
 - ✅ **Updated CHART_MARGINS** to use Plotly-compatible property names
 - ✅ **Added missing imports** for plotly.express and timedelta
 
-## 🧪 Testing
+## 🔗 Linear Integration
 
-Run tests with:
+This project is integrated with Linear for issue tracking and project management:
+
+- **Linear Project**: [MT5 Trading Dashboard](https://linear.app/mt5-trading-dashboard)
+- **Issue Tracking**: [MT5-3: Connect Your Tools](https://linear.app/mt5-trading-dashboard/issue/MT5-3/connect-your-tools-3)
+
+### Linear Setup
+
+1. **Get API Key**: Visit [Linear API Settings](https://linear.app/settings/api)
+2. **Configure Environment**: Copy `linear_config.env` to `.env` and fill in your API key
+3. **Install Dependencies**: `pip install requests python-dotenv`
+
+### Linear Commands
+
 ```bash
-python tests/run_tests.py
+# Sync with Linear
+python linear_sync.py
+
+# Create new issue
+python linear_integration.py
+
+# Update issue status
+python -c "from linear_integration import LinearIntegration; LinearIntegration().update_issue_status('MT5-3', 'completed')"
 ```
+
+### Integration Features
+
+- ✅ **Automatic Issue Creation**: From Git commits
+- ✅ **Status Synchronization**: Between Linear and GitHub
+- ✅ **Progress Tracking**: Monitor development progress
+- ✅ **Issue Management**: Create, update, and track issues
 
 ## 📝 Dependencies
 
