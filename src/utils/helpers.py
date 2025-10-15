@@ -72,7 +72,7 @@ class PerformanceUtils:
         """Calculate percentage change"""
         if start == 0:
             return 0
-        return (current / start) * 100
+        return ((current - start) / start) * 100
     
     @staticmethod
     def get_performance_color(percentage: float) -> str:

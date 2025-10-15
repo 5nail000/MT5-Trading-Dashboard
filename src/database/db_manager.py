@@ -12,7 +12,7 @@ class DatabaseManager:
     """Manages database operations"""
     
     def __init__(self, db_path: str = None):
-        self.db_path = db_path or DatabaseConfig.TABLES["magic_descriptions"]["name"]
+        self.db_path = db_path or DatabaseConfig.DATABASE_PATH
     
     @contextmanager
     def get_connection(self):

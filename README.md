@@ -72,7 +72,7 @@ MT5_Trading_Dashboard/
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/5nail000/MT5-Trading-Dashboard/
    cd MT5_Trading_Dashboard
    ```
 
@@ -117,7 +117,6 @@ Edit `src/config/settings.py` to customize:
 
 ```python
 # Trading settings
-BALANCE_START = 8736
 CUSTOM_TEXT = "2nd week of October"
 LOCAL_TIMESHIFT = 3
 
@@ -131,6 +130,58 @@ PERFORMANCE_THRESHOLDS = {
     "critical": -20
 }
 ```
+
+### Balance Calculation Function
+
+The dashboard now includes a sophisticated balance calculation function:
+
+```python
+from src.mt5.mt5_client import mt5_calculator
+
+# Calculate balance at beginning of day (default)
+balance = mt5_calculator.calculate_balance_at_date(
+    target_date=datetime(2025, 10, 10),
+    deals=trade_history
+)
+
+# Calculate balance at end of day
+balance = mt5_calculator.calculate_balance_at_date(
+    target_date=datetime(2025, 10, 10),
+    deals=trade_history,
+    end_of_day=True
+)
+```
+
+**Features:**
+- ✅ **Automatic balance calculation** based on trade history
+- ✅ **Timezone support** with `LOCAL_TIMESHIFT` configuration
+- ✅ **Beginning/end of day** options
+- ✅ **No more hardcoded BALANCE_START** - everything is calculated dynamically
+
+### Command Line Tool
+
+The project includes a command-line tool for quick balance calculations:
+
+```bash
+# Calculate balance at beginning of day
+
+python tests/balance_calculation/balance_by_date.py --date 2025-09-27
+
+# Calculate balance at end of day
+python tests/balance_calculation/balance_by_date.py --date 2025-09-27 --end-of-day
+
+# Calculate with custom initial balance
+python tests/balance_calculation/balance_by_date.py --date 2025-10-10 --initial-balance 1000
+
+# Detailed output with verbose mode
+python tests/balance_calculation/balance_by_date.py --date 2025-09-30 --verbose
+```
+
+**Supported date formats:**
+- `2025-09-27` (ISO format)
+- `27-09-2025` (European format)
+- `27/09/2025` (Slash format)
+- `27.09.2025` (Dot format)
 
 ## 🏛️ Architecture
 
@@ -182,10 +233,10 @@ This project is integrated with Linear for issue tracking and project management
 
 ```bash
 # Sync with Linear
-python linear_sync.py
+python linear/linear_sync.py
 
 # Create new issue
-python linear_integration.py
+python linear/linear_integration.py
 
 # Update issue status
 python -c "from linear_integration import LinearIntegration; LinearIntegration().update_issue_status('MT5-3', 'completed')"

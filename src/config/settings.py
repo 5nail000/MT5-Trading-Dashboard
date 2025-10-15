@@ -125,6 +125,8 @@ class UIConfig:
 class DatabaseConfig:
     """Database configuration"""
     
+    DATABASE_PATH = "magics.db"
+    
     TABLES = {
         "magic_descriptions": {
             "name": "magic_descriptions",

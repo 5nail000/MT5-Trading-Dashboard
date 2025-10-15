@@ -74,7 +74,11 @@ class MT5DataProvider:
         if from_date is None:
             from_date = datetime(2020, 1, 1)
         if to_date is None:
-            to_date = datetime.now() + timedelta(hours=Config.LOCAL_TIMESHIFT)
+            to_date = datetime.now()
+        
+        # Convert local time to UTC for MT5 API
+        from_date_utc = from_date - timedelta(hours=Config.LOCAL_TIMESHIFT)
+        to_date_utc = to_date - timedelta(hours=Config.LOCAL_TIMESHIFT)
         
         if not self.connection.initialize(account):
             return None, None
@@ -84,7 +88,7 @@ class MT5DataProvider:
             self.connection.shutdown()
             return None, None
         
-        deals = mt5.history_deals_get(from_date, to_date)
+        deals = mt5.history_deals_get(from_date_utc, to_date_utc)
         self.connection.shutdown()
         
         return deals, account_info
@@ -107,6 +111,62 @@ class MT5DataProvider:
 
 class MT5Calculator:
     """Calculates trading metrics"""
+    
+    @staticmethod
+    def calculate_balance_at_date(target_date: datetime, deals: List, 
+                                 initial_balance: float = None, 
+                                 end_of_day: bool = False) -> float:
+        """
+        Вычисляет баланс на указанную дату
+        
+        Args:
+            target_date: Дата, на которую нужно вычислить баланс
+            deals: Список всех сделок из истории
+            initial_balance: Начальный баланс (если None, используется 0)
+            end_of_day: Если True - баланс на конец дня (23:59:59), 
+                       если False - баланс на начало дня (00:00:00)
+            
+        Returns:
+            Баланс на указанную дату
+        """
+        
+        if not deals:
+            return initial_balance or 0.0
+        
+        # Если initial_balance не указан, используем 0 (начинаем с самого начала)
+        if initial_balance is None:
+            initial_balance = 0.0
+        
+        # Конвертируем местное время в UTC для сравнения с данными MT5
+        if end_of_day:
+            # Используем конец дня (23:59:59) в местном времени
+            target_date_time = target_date.replace(hour=23, minute=59, second=59)
+        else:
+            # Используем начало дня (00:00:00) в местном времени
+            target_date_time = target_date.replace(hour=0, minute=0, second=0)
+        
+        target_date_utc = target_date_time + timedelta(hours=Config.LOCAL_TIMESHIFT)
+        target_timestamp = target_date_utc.timestamp()
+        
+        # Сортируем сделки по времени
+        sorted_deals = sorted(deals, key=lambda x: x.time)
+        
+        # Начинаем с начального баланса и добавляем сделки до указанной даты
+        balance = initial_balance
+        
+        for deal in sorted_deals:
+            # Пропускаем сделки после целевой даты
+            if deal.time > target_timestamp:
+                break
+            
+            # Учитываем только сделки изменения баланса (type == 2)
+            if deal.type == 2:
+                balance += deal.profit
+            else:
+                # Для обычных сделок добавляем прибыль/убыток
+                balance += deal.profit + deal.commission + deal.swap
+        
+        return balance
     
     @staticmethod
     def calculate_open_profits_by_magics(positions: List) -> Dict[str, Any]:

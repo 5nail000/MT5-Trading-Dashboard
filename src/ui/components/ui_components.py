@@ -187,9 +187,10 @@ class MagicDescriptionComponent:
                 with col2:
                     desc = db_manager.get_magic_description(account_id, magic)
                     new_desc = st.text_input(
-                        "", 
+                        f"Описание Magic {magic}", 
                         value=desc or "", 
-                        key=f"desc_{magic}_{account_id}"
+                        key=f"desc_{magic}_{account_id}",
+                        label_visibility="collapsed"
                     )
                 
                 with col3:
@@ -205,7 +206,7 @@ class StatusComponent:
     def show_performance_summary(total_summ: float, balance_start: float, 
                                custom_text: str):
         """Show performance summary"""
-        percent_change = performance_utils.calculate_percentage_change(total_summ, balance_start)
+        percent_change = performance_utils.calculate_percentage_change(total_summ + balance_start, balance_start)
         color = performance_utils.get_performance_color(percent_change)
         
         summary_text = (
@@ -220,7 +221,7 @@ class StatusComponent:
     @staticmethod
     def show_floating_summary(total_floating: float, current_balance: float):
         """Show floating P/L summary"""
-        percent_floating = performance_utils.calculate_percentage_change(total_floating, current_balance)
+        percent_floating = performance_utils.calculate_percentage_change(total_floating + current_balance, current_balance)
         color = performance_utils.get_performance_color(percent_floating)
         
         summary_text = (

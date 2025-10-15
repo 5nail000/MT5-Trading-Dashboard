@@ -110,8 +110,8 @@ def handle_auto_refresh(session_state, date_presets):
     
     # Fetch and process data
     trade_history, account_info = mt5_data_provider.get_history(
-        from_date=session_state.from_date + timedelta(hours=config.LOCAL_TIMESHIFT),
-        to_date=session_state.to_date + timedelta(hours=config.LOCAL_TIMESHIFT)
+        from_date=session_state.from_date,
+        to_date=session_state.to_date
     )
     
     if trade_history is not None:
@@ -157,8 +157,8 @@ def load_initial_data(session_state, date_presets):
     session_state.to_date = session_state.pending_to_date
     
     trade_history, account_info = mt5_data_provider.get_history(
-        from_date=session_state.from_date + timedelta(hours=config.LOCAL_TIMESHIFT),
-        to_date=session_state.to_date + timedelta(hours=config.LOCAL_TIMESHIFT)
+        from_date=session_state.from_date,
+        to_date=session_state.to_date
     )
     
     if trade_history is None:
@@ -194,8 +194,8 @@ def handle_manual_recalculate(session_state, date_presets):
     session_state.to_date = session_state.pending_to_date
     
     trade_history, account_info = mt5_data_provider.get_history(
-        from_date=session_state.from_date + timedelta(hours=config.LOCAL_TIMESHIFT),
-        to_date=session_state.to_date + timedelta(hours=config.LOCAL_TIMESHIFT)
+        from_date=session_state.from_date,
+        to_date=session_state.to_date
     )
     
     if trade_history is None:
@@ -246,6 +246,28 @@ def render_main_content(session_state):
     
     # Create tabs
     tab1, tab2, tab3, tab4 = st.tabs(UIConfig.TABS)
+
+    # Calculate balance at the beginning of the period
+    # Note: Для корректного расчета баланса нужна полная история сделок
+    # Получаем данные с самого начала
+    full_trade_history, _ = mt5_data_provider.get_history(
+        from_date=datetime(2020, 1, 1),  # Начало истории
+        to_date=session_state.to_date    # До конца выбранного периода
+    )
+    
+    if full_trade_history is not None:
+        balance_at_start = mt5_calculator.calculate_balance_at_date(
+            target_date=session_state.from_date,
+            deals=full_trade_history,
+            end_of_day=False  # Beginning of day
+        )
+    else:
+        # Fallback на ограниченные данные если полная история недоступна
+        balance_at_start = mt5_calculator.calculate_balance_at_date(
+            target_date=session_state.from_date,
+            deals=trade_history,
+            end_of_day=False  # Beginning of day
+        )
     
     # Render each tab
     with tab1:
@@ -253,7 +275,7 @@ def render_main_content(session_state):
             session_state.get('open_profits', {}),
             account_id,
             db_manager,
-            config.BALANCE_START,
+            balance_at_start,
             session_state.get('account_info_open')
         )
         
@@ -265,7 +287,7 @@ def render_main_content(session_state):
             magic_profits,
             account_id,
             db_manager,
-            config.BALANCE_START,
+            balance_at_start,
             config.CUSTOM_TEXT,
             session_state.from_date,
             session_state.to_date
