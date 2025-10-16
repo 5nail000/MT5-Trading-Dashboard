@@ -7,6 +7,10 @@ import os
 import requests
 import json
 from typing import Dict, List, Optional
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 class LinearIntegration:
     """Linear API integration class"""
@@ -16,7 +20,7 @@ class LinearIntegration:
         self.team_id = team_id or os.getenv('LINEAR_TEAM_ID', 'mt5-trading-dashboard')
         self.base_url = "https://api.linear.app/graphql"
         self.headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": self.api_key,
             "Content-Type": "application/json"
         }
     
@@ -88,10 +92,56 @@ class LinearIntegration:
             json={"query": query, "variables": variables}
         )
         
-        return response.json().get('data', {}).get('issues', {}).get('nodes', [])
+        result = response.json()
+        if 'data' in result and result['data']:
+            return result['data'].get('issues', {}).get('nodes', [])
+        return []
+    
+    def get_workflow_states(self) -> Dict:
+        """Get available workflow states"""
+        query = """
+        query WorkflowStates {
+            workflowStates {
+                nodes {
+                    id
+                    name
+                    type
+                }
+            }
+        }
+        """
+        
+        response = requests.post(
+            self.base_url,
+            headers=self.headers,
+            json={"query": query}
+        )
+        
+        result = response.json()
+        if 'data' in result and result['data']:
+            return result['data'].get('workflowStates', {}).get('nodes', [])
+        return []
     
     def update_issue(self, issue_id: str, **kwargs) -> Dict:
         """Update an issue"""
+        # Handle state name to stateId conversion
+        if 'state' in kwargs and isinstance(kwargs['state'], dict) and 'name' in kwargs['state']:
+            state_name = kwargs['state']['name']
+            states = self.get_workflow_states()
+            
+            # Find state by name
+            state_id = None
+            for state in states:
+                if state['name'] == state_name:
+                    state_id = state['id']
+                    break
+            
+            if state_id:
+                kwargs['stateId'] = state_id
+                del kwargs['state']
+            else:
+                return {"error": f"State '{state_name}' not found"}
+        
         query = """
         mutation IssueUpdate($id: String!, $input: IssueUpdateInput!) {
             issueUpdate(id: $id, input: $input) {
