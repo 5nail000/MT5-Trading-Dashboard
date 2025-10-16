@@ -1,0 +1,23 @@
+# Cursor IDE ignore file
+# Files and folders to ignore in Cursor
+
+# Environment files (except examples)
+.env
+.env.local
+.env.*.local
+
+# But include examples
+!.env.example
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

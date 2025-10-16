@@ -115,19 +115,22 @@ class MT5Calculator:
     @staticmethod
     def calculate_balance_at_date(target_date: datetime, deals: List, 
                                  initial_balance: float = None, 
-                                 end_of_day: bool = False) -> float:
+                                 end_of_day: bool = False,
+                                 use_exact_time: bool = False) -> float:
         """
         Вычисляет баланс на указанную дату
         
         Args:
-            target_date: Дата, на которую нужно вычислить баланс
+            target_date: Дата и время, на которые нужно вычислить баланс
             deals: Список всех сделок из истории
             initial_balance: Начальный баланс (если None, используется 0)
             end_of_day: Если True - баланс на конец дня (23:59:59), 
                        если False - баланс на начало дня (00:00:00)
+            use_exact_time: Если True - использует точное время из target_date,
+                          если False - использует начало/конец дня
             
         Returns:
-            Баланс на указанную дату
+            Баланс на указанную дату и время
         """
         
         if not deals:
@@ -138,7 +141,10 @@ class MT5Calculator:
             initial_balance = 0.0
         
         # Конвертируем местное время в UTC для сравнения с данными MT5
-        if end_of_day:
+        if use_exact_time:
+            # Используем точное время из target_date
+            target_date_time = target_date
+        elif end_of_day:
             # Используем конец дня (23:59:59) в местном времени
             target_date_time = target_date.replace(hour=23, minute=59, second=59)
         else:
