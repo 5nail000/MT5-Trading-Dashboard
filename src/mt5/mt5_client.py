@@ -230,12 +230,17 @@ class MT5Calculator:
         magic_total_sums = {}
         
         for deal in deals:
+            deal_time = datetime.fromtimestamp(deal.time) - timedelta(hours=Config.LOCAL_TIMESHIFT)
             if deal.type == 2:  # Balance changes
                 continue
-            if from_date and deal.time < from_date.timestamp():
+            if from_date and deal_time < from_date:
                 continue
-            if to_date and deal.time > to_date.timestamp():
+            if to_date and deal_time > to_date:
                 continue
+
+            print("\n\ndeal:", deal.symbol, "\ndeal.magic:", deal.magic, "\ndeal.profit:", deal.profit, "\ndeal.commission:", deal.commission, "\ndeal.swap:", deal.swap, "\ndeal.position_id:", deal.position_id)
+            print("\ndeal.time:",datetime.fromtimestamp(deal.time), "\nfrom_date:", from_date, "\nto_date:", to_date)
+            # print("\ndeal.time:",datetime.fromtimestamp(deal.time), "\nfrom_date:", from_date, "\nto_date:", to_date)
             
             magic_key = deal.magic
             if magic_key == 0:

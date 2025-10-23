@@ -1,0 +1,123 @@
+### Задача: Разработка функции расчёта просадки (drawdown), маржи и других метрик для торгового дашборда MT5
+
+#### Общая цель
+Разработать новую функцию (или класс) на Python в модуле `src/mt5/mt5_client.py` (расширяя существующий `MT5Calculator`), которая будет рассчитывать ключевые торговые метрики, включая **просадку (drawdown)**, **используемую маржу (margin used)**, **количество лотов (lots)** и **изменение баланса (balance delta)**, на основе истории сделок (deals) и открытых позиций. 
+
+Функция должна работать в заданном **временном срезе** (от даты/времени начала до даты/времени конца) и поддерживать **группировку** по:
+- **Magic number** (или группы magic'ов, заданные как список или диапазон).
+- **Символу (symbol)** (или группы символов, заданные как список).
+- **Направлению сделок** (BUY, SELL или совокупно — TOTAL).
+- **Общему уровню** (все сделки без группировки).
+
+Результат расчёта — **табличная структура** (в формате Pandas DataFrame или списка словарей), которая представляет собой серию **снэпшотов** (моментальных снимков) состояния на ключевых точках:
+- На **момент начала среза**.
+- На **каждом событии изменения** (добавление новой позиции/сделки, частичное/полное закрытие, модификация — например, изменение SL/TP, но фокус на volume changes).
+
+Эти снэпшоты будут использоваться для построения **графиков** в дашборде (Streamlit + Plotly): 
+- Equity curve с просадкой (линия equity + shaded area для max drawdown).
+- Барчарты по лотам/марже по группам.
+- Таблицы для отображения метрик в табах (например, "Drawdown Analysis").
+
+Функция должна быть **эффективной** (O(n) по количеству deals, где n — число сделок в срезе) и **модульной**, чтобы легко интегрироваться в существующий `MT5DataProvider` для реал-тайм обновлений (auto-refresh). Использовать существующие утилиты: `calculate_balance_at_date` для базового баланса, `DateUtils` для обработки времени, Pandas для табличных структур.
+
+#### Входные параметры функции
+Функция: `calculate_drawdown_snapshots(start_time: datetime, end_time: datetime, magic_groups: Optional[List[int]] = None, symbol_groups: Optional[List[str]] = None, directions: List[str] = ['BUY', 'SELL', 'TOTAL'], initial_balance: float = 0.0, include_total: bool = True) -> pd.DataFrame`
+
+- `start_time`: datetime — начало временного среза (исключая, т.е. deals >= start_time).
+- `end_time`: datetime — конец среза (включая, deals <= end_time). Если None — до текущего времени.
+- `magic_groups`: Optional[List[int]] — список magic numbers или групп (например, [[1,2,3], [4]] для двух групп). Если None — все magic'и.
+- `symbol_groups`: Optional[List[str]] — список символов или групп (например, [['EURUSD', 'GBPUSD'], ['XAUUSD']]). Если None — все символы.
+- `directions`: List[str] — фильтр по направлению: 'BUY', 'SELL', 'TOTAL' (для совокупного расчёта). Поддерживать комбинации, напр. ['BUY', 'TOTAL'].
+- `initial_balance`: float — начальный баланс на момент перед start_time (по умолчанию 0; можно вычислить из истории, если нужно).
+- `include_total`: bool — флаг для включения агрегированной группы 'TOTAL' в вывод (по умолчанию True). Если True, в DataFrame добавляются суммарные метрики по всем данным (без разбивки по группам); если False — только детализированные группы.
+
+Дополнительно: функция должна вызывать MT5 API (`MetaTrader5.history_deals_get(start_time, end_time)`) для получения deals и `positions_get()` для открытых позиций на start_time.
+
+#### Ключевые понятия и определения
+Перед логикой — чёткие определения, чтобы избежать неоднозначностей:
+- **Сделка (deal)**: Элемент из `history_deals_get()` — включает type (DEAL_TYPE_BUY/SELL), volume (лот), price, profit, time, position_id, magic, symbol.
+- **Позиция**: Реконструируется из deals (группировка по position_id): текущий volume = сумма входов - сумма выходов; direction из первого deal.
+- **Группа**: Комбинация (magic_group, symbol_group, direction). Для 'TOTAL' — агрегировать по magic+symbol без direction split.
+- **Событие изменения**: Любая deal, которая влияет на позиции/equity:
+  - Добавление (DEAL_ENTRY_IN): новая позиция или увеличение volume.
+  - Уменьшение (DEAL_ENTRY_OUT): частичное/полное закрытие.
+  - Полная ликвидация: когда volume позиции становится 0.
+  - Игнорировать: корректировки без volume changes (напр. DEAL_TYPE_BALANCE для депозитов/выводов — обрабатывать отдельно как balance adjustments).
+- **Equity на момент t**: `balance_at_t + floating_pnl_at_t`, где:
+  - `balance_at_t` — рассчитывается кумулятивно из `calculate_balance_at_date` (или аналогично: initial + sum(profit from closed deals up to t) + balance adjustments).
+  - `floating_pnl_at_t` — сумма unrealized P/L от открытых позиций на t (из `positions_get()` или реконструкции из deals up to t).
+- **Просадка (drawdown)**: Максимальное падение equity от пика (absolute drawdown в % или absolute value). Для каждого снэпшота:
+  - Текущая просадка: (peak_equity - current_equity) / peak_equity * 100 (если %).
+  - Max просадка за период: max over all snapshots up to now.
+  - Рассчитывать **по группам**: для каждой группы — отдельный equity curve (sum PNL только от deals/positions в группе).
+- **Маржа (margin used)**: Текущая требуемая маржа для открытых позиций в группе. Рассчитывать как `volume * contract_size * price * margin_rate` (использовать MT5 API `order_calc_margin()` для точности, или упрощённо из position margin в `positions_get()`).
+- **Лоты (lots)**: Суммарный |volume| открытых позиций в группе (абсолют, без знака direction).
+- **Изменение баланса (balance delta)**: `current_balance - initial_balance` (только closed PNL + adjustments; floating PNL в equity).
+
+#### Логика расчёта шаг за шагом
+1. **Подготовка данных**:
+   - Получить все deals: `deals = mt5.history_deals_get(start_time, end_time)`.
+   - Отфильтровать deals по magic_groups, symbol_groups, directions (если указано).
+   - Отсортировать deals по `deal.time` (ascending).
+   - Реконструировать начальные позиции на start_time: использовать deals before start_time или `positions_get()` на start_time (фильтр по группам).
+   - Вычислить initial_balance (если не задан: вызвать `calculate_balance_at_date(start_time - epsilon)`).
+   - Инициализировать структуры:
+     - `positions`: dict[position_id -> {'symbol': str, 'magic': int, 'direction': str, 'volume': float, 'open_price': float, ...}]
+     - `equity_history`: list[dict] для хранения снэпшотов.
+     - `peak_equity`: dict[group_key -> float] = initial_equity per group.
+     - `max_drawdown`: dict[group_key -> float] = 0.
+
+2. **Создание первого снэпшота (на start_time)**:
+   - Для каждой группы (комбинация magic_group, symbol_group, direction_or_TOTAL):
+     - `lots[group]`: sum(|volume| от initial positions in group).
+     - `margin[group]`: sum(margin от initial positions in group) — вызов `mt5.order_calc_margin()` для каждой или агрегировать из position.margin.
+     - `max_drawdown[group]`: 0 (пока нет изменений; или рассчитать от "начала отсчёта" — если есть исторические данные до start_time, но по умолчанию 0).
+     - `balance_delta[group]`: 0 (начало).
+     - `equity[group]`: initial_balance (shared) + floating_pnl от initial positions in group.
+     - `current_drawdown[group]`: 0.
+   - Добавить снэпшот в `equity_history`: {'timestamp': start_time, 'group_key': ..., 'lots': ..., 'margin': ..., 'max_drawdown': ..., 'balance_delta': ..., 'equity': ..., 'current_drawdown': ...}
+   - Обновить `peak_equity[group] = max(peak_equity[group], equity[group])` для всех групп.
+
+3. **Итерация по событиям (для каждой deal в sorted deals)**:
+   - Определить группу deal (по magic, symbol, direction).
+   - Если deal не в фильтре — skip.
+   - Обработать deal:
+     - Если DEAL_ENTRY_IN (вход/добавление): обновить/создать position: volume += deal.volume; floating_pnl += (current_price - open_price) * volume * multiplier (но для точности — recalculate full pnl).
+     - Если DEAL_ENTRY_OUT (выход/уменьшение): volume -= deal.volume; если volume == 0 — удалить position; добавить closed_profit = deal.profit к balance.
+     - Для balance adjustments (DEAL_TYPE_BALANCE): balance += deal.profit.
+     - Полная ликвидация: если volume -> 0, отметить как событие.
+   - Пересчитать метрики для затронутых групп (и TOTAL, если применимо):
+     - `lots[group]`: обновить sum(|volume| от positions in group).
+     - `margin[group]`: пересчитать с `mt5.order_calc_margin(symbol, type, volume, price)` для каждой позиции.
+     - `equity[group]`: balance + sum(floating_pnl from positions in group).
+     - `current_drawdown[group]`: max(0, (peak_equity[group] - equity[group]) / peak_equity[group] * 100).
+     - `max_drawdown[group]`: max(max_drawdown[group], current_drawdown[group]).
+     - `balance_delta[group]`: balance - initial_balance (или per-group closed PNL).
+   - Обновить `peak_equity[group] = max(peak_equity[group], equity[group])`.
+   - Добавить новый снэпшот: {'timestamp': deal.time, ...} — только если метрики изменились (delta > epsilon, напр. 0.01).
+
+4. **Финальный снэпшот (на end_time)**:
+   - Если есть открытые позиции на end_time — добавить их floating PNL.
+   - Повторить шаг 3 для "виртуального" события на end_time (без deal).
+   - Если end_time > last deal — интерполировать или просто использовать last state.
+
+5. **Формирование выхода**:
+   - `pd.DataFrame(equity_history)` с колонками: timestamp, group_key (str, напр. 'magic_1_symbol_EURUSD_BUY'), lots, margin, max_drawdown, balance_delta, equity, current_drawdown.
+   - Добавить агрегированные строки: если `include_total == True`, рассчитать TOTAL-метрики для каждого timestamp: 
+     - `lots_total = sum(lots over all groups)`.
+     - `margin_total = sum(margin over all groups)`.
+     - `equity_total = initial_balance + sum(closed_pnl_all) + sum(floating_pnl_all)`.
+     - `drawdown_total`: Отдельный peak для TOTAL (не сумма drawdown'ов, а drawdown от агрегированного equity curve).
+     - `balance_delta_total = sum(balance_delta over all groups)`.
+     - Добавить строки с `group_key = 'TOTAL'` для каждого снэпшота.
+   - Если `include_total == False`, пропустить TOTAL и вывести только детализированные группы.
+   - Обработать edge cases: нет deals — только initial snapshot; пустые группы — пропустить.
+
+#### Требования к реализации
+- **Обработка ошибок**: Логировать (logging) если MT5 не подключен; fallback на cached data.
+- **Производительность**: Кэшировать reconstructions positions (использовать defaultdict). Для больших историй — батчинг deals.
+- **Тестирование**: Добавить unit-тесты в `tests/` с mock deals (напр. 3 deals: open BUY 1 lot, partial close 0.5, full close).
+- **Интеграция**: В `app.py` или `pages.py` — вызвать функцию в callbacks для таба "Drawdown Analysis"; передать DF в Plotly (line для equity, bar для margin/lots).
+- **Расширения**: Поддержка % drawdown vs absolute; фильтр по min_lots >0 для групп.
+
+Эта логика обеспечивает полную traceability: каждый снэпшот tied к событию, equity curve строится incrementally. LLM может генерировать код по шагам, начиная с подготовки данных.
