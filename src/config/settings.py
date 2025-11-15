@@ -20,7 +20,7 @@ class Config:
     
     # Trading settings
     BALANCE_START = 8736
-    CUSTOM_TEXT = "2nd week of October"
+    CUSTOM_TEXT = "October"
     LOCAL_TIMESHIFT = 3
     
     # Auto-refresh settings
@@ -134,6 +134,35 @@ class DatabaseConfig:
                 CREATE TABLE IF NOT EXISTS magic_descriptions
                 (account TEXT, magic INTEGER, description TEXT, 
                  PRIMARY KEY(account, magic))
+            """
+        },
+        "account_settings": {
+            "name": "account_settings",
+            "schema": """
+                CREATE TABLE IF NOT EXISTS account_settings
+                (account_id TEXT PRIMARY KEY, account_title TEXT)
+            """
+        },
+        "magic_groups": {
+            "name": "magic_groups",
+            "schema": """
+                CREATE TABLE IF NOT EXISTS magic_groups
+                (id INTEGER PRIMARY KEY AUTOINCREMENT, account_id TEXT, name TEXT)
+            """
+        },
+        "magic_group_assignments": {
+            "name": "magic_group_assignments",
+            "schema": """
+                CREATE TABLE IF NOT EXISTS magic_group_assignments
+                (account_id TEXT, group_id INTEGER, magic INTEGER,
+                 PRIMARY KEY(account_id, group_id, magic))
+            """
+        },
+        "view_settings": {
+            "name": "view_settings",
+            "schema": """
+                CREATE TABLE IF NOT EXISTS view_settings
+                (account_id TEXT PRIMARY KEY, view_mode TEXT)
             """
         }
     }

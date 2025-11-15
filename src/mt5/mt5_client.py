@@ -223,11 +223,19 @@ class MT5Calculator:
     @staticmethod
     def calculate_by_magics(deals: List, symbol: str = None, 
                           from_date: datetime = None, 
-                          to_date: datetime = None) -> Dict[str, Any]:
-        """Calculate profits grouped by magic numbers"""
+                          to_date: datetime = None,
+                          magic_groups: Optional[Dict[int, List[int]]] = None) -> Dict[str, Any]:
+        """Calculate profits grouped by magic numbers or groups"""
         magic_profits = {}
         magics_summ = 0
         magic_total_sums = {}
+        
+        # Create reverse mapping: magic -> group_id (if grouped)
+        magic_to_group = {}
+        if magic_groups:
+            for group_id, magics in magic_groups.items():
+                for magic in magics:
+                    magic_to_group[magic] = group_id
         
         for deal in deals:
             deal_time = datetime.fromtimestamp(deal.time) - timedelta(hours=Config.LOCAL_TIMESHIFT)
@@ -237,10 +245,6 @@ class MT5Calculator:
                 continue
             if to_date and deal_time > to_date:
                 continue
-
-            print("\n\ndeal:", deal.symbol, "\ndeal.magic:", deal.magic, "\ndeal.profit:", deal.profit, "\ndeal.commission:", deal.commission, "\ndeal.swap:", deal.swap, "\ndeal.position_id:", deal.position_id)
-            print("\ndeal.time:",datetime.fromtimestamp(deal.time), "\nfrom_date:", from_date, "\nto_date:", to_date)
-            # print("\ndeal.time:",datetime.fromtimestamp(deal.time), "\nfrom_date:", from_date, "\nto_date:", to_date)
             
             magic_key = deal.magic
             if magic_key == 0:
@@ -249,8 +253,13 @@ class MT5Calculator:
                         magic_key = d.magic
                         break
             
+            # If grouping is enabled, use group_id instead of magic_key
+            display_key = magic_key
+            if magic_groups and magic_key in magic_to_group:
+                display_key = magic_to_group[magic_key]
+            
             symbol_key = deal.symbol if symbol is None else symbol
-            key = (magic_key, symbol_key)
+            key = (display_key, symbol_key)
             
             if key not in magic_profits:
                 magic_profits[key] = 0.0
@@ -259,9 +268,9 @@ class MT5Calculator:
             magic_profits[key] += deal_profit
             magics_summ += deal_profit
             
-            if magic_key not in magic_total_sums:
-                magic_total_sums[magic_key] = 0.0
-            magic_total_sums[magic_key] += deal_profit
+            if display_key not in magic_total_sums:
+                magic_total_sums[display_key] = 0.0
+            magic_total_sums[display_key] += deal_profit
         
         magic_profits["Summ"] = magics_summ
         if magic_total_sums and magic_total_sums.get(0) is not None:

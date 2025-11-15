@@ -502,7 +502,7 @@ if 'magic_profits' in st.session_state:
                 margin=dict(t=100, b=40, l=40, r=20)
             )
 
-            st.plotly_chart(fig_open, use_container_width=True)
+            st.plotly_chart(fig_open)
 
             # Drill-down: Select magic for symbol and type breakdown
             selected_magic_open = st.selectbox("Select Magic for Details (None for Overview)", [None] + magics_open)
@@ -535,7 +535,7 @@ if 'magic_profits' in st.session_state:
                         showlegend=False,
                         margin=dict(t=40, b=40, l=40, r=20)
                     )
-                    st.plotly_chart(fig_breakdown, use_container_width=True)
+                    st.plotly_chart(fig_breakdown)
 
                     # Table for precise values
                     st.dataframe(df_breakdown[['Symbol', 'Type', 'Floating']].round(2))
@@ -611,7 +611,7 @@ if 'magic_profits' in st.session_state:
             margin=dict(t=120, b=40, l=40, r=20)  # Увеличен top
         )
 
-        st.plotly_chart(fig_results, use_container_width=True)
+        st.plotly_chart(fig_results)
 
     with tab3:
         st.subheader("Distribution of Profits / Losses")
@@ -678,4 +678,4 @@ if 'magic_profits' in st.session_state:
                 # Changed to vertical bar chart: hours on x-axis (horizontal), deals on y-axis (vertical)
                 fig_hours = px.bar(counts, x='hour', y='count',
                                    labels={'count': 'Number of Deals', 'hour': 'Hour'})
-                st.plotly_chart(fig_hours, use_container_width=True)
+                st.plotly_chart(fig_hours)

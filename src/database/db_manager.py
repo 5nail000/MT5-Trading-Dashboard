@@ -27,7 +27,9 @@ class DatabaseManager:
         """Initialize database tables"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(DatabaseConfig.TABLES["magic_descriptions"]["schema"])
+            # Initialize all tables
+            for table_name, table_config in DatabaseConfig.TABLES.items():
+                cursor.execute(table_config["schema"])
             conn.commit()
     
     def get_magic_description(self, account: str, magic: int) -> Optional[str]:
@@ -68,6 +70,140 @@ class DatabaseManager:
             cursor.execute(
                 "DELETE FROM magic_descriptions WHERE account=? AND magic=?",
                 (account, magic)
+            )
+            conn.commit()
+    
+    def get_account_title(self, account_id: str) -> Optional[str]:
+        """Get account title"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT account_title FROM account_settings WHERE account_id=?",
+                (account_id,)
+            )
+            result = cursor.fetchone()
+            return result[0] if result else None
+    
+    def set_account_title(self, account_id: str, title: str):
+        """Set account title"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT OR REPLACE INTO account_settings (account_id, account_title) VALUES (?, ?)",
+                (account_id, title)
+            )
+            conn.commit()
+    
+    def create_magic_group(self, account_id: str, group_name: str) -> int:
+        """Create a new magic group and return its ID"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO magic_groups (account_id, name) VALUES (?, ?)",
+                (account_id, group_name)
+            )
+            conn.commit()
+            return cursor.lastrowid
+    
+    def add_magic_to_group(self, account_id: str, group_id: int, magic: int):
+        """Add a magic number to a group"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT OR REPLACE INTO magic_group_assignments (account_id, group_id, magic) VALUES (?, ?, ?)",
+                (account_id, group_id, magic)
+            )
+            conn.commit()
+    
+    def remove_magic_from_group(self, account_id: str, group_id: int, magic: int):
+        """Remove a magic number from a group"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM magic_group_assignments WHERE account_id=? AND group_id=? AND magic=?",
+                (account_id, group_id, magic)
+            )
+            conn.commit()
+    
+    def get_magic_groups(self, account_id: str) -> Dict[int, Dict]:
+        """Get all magic groups for an account with their magics"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            # Get all groups
+            cursor.execute(
+                "SELECT id, name FROM magic_groups WHERE account_id=?",
+                (account_id,)
+            )
+            groups = cursor.fetchall()
+            
+            result = {}
+            for group_id, group_name in groups:
+                # Get magics for this group
+                cursor.execute(
+                    "SELECT magic FROM magic_group_assignments WHERE account_id=? AND group_id=?",
+                    (account_id, group_id)
+                )
+                magics = [row[0] for row in cursor.fetchall()]
+                result[group_id] = {
+                    "name": group_name,
+                    "magics": magics
+                }
+            return result
+    
+    def get_magics_by_group(self, account_id: str) -> Dict[int, int]:
+        """Get mapping of magic -> group_id"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT magic, group_id FROM magic_group_assignments WHERE account_id=?",
+                (account_id,)
+            )
+            return dict(cursor.fetchall())
+    
+    def delete_magic_group(self, account_id: str, group_id: int):
+        """Delete a magic group and all its assignments"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            # Delete assignments first
+            cursor.execute(
+                "DELETE FROM magic_group_assignments WHERE account_id=? AND group_id=?",
+                (account_id, group_id)
+            )
+            # Delete group
+            cursor.execute(
+                "DELETE FROM magic_groups WHERE account_id=? AND id=?",
+                (account_id, group_id)
+            )
+            conn.commit()
+    
+    def update_magic_group_name(self, account_id: str, group_id: int, new_name: str):
+        """Update magic group name"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE magic_groups SET name=? WHERE account_id=? AND id=?",
+                (new_name, account_id, group_id)
+            )
+            conn.commit()
+    
+    def get_view_mode(self, account_id: str) -> str:
+        """Get view mode (individual or grouped)"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT view_mode FROM view_settings WHERE account_id=?",
+                (account_id,)
+            )
+            result = cursor.fetchone()
+            return result[0] if result else "individual"
+    
+    def set_view_mode(self, account_id: str, mode: str):
+        """Set view mode (individual or grouped)"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT OR REPLACE INTO view_settings (account_id, view_mode) VALUES (?, ?)",
+                (account_id, mode)
             )
             conn.commit()
     

@@ -1,6 +1,7 @@
 """
 Командный инструмент для расчета баланса на указанную дату
-Запуск: python balance_by_date.py --date 2025-09-27
+Запуск: python balance_by_date.py --date 2025-11-10
+        python tests/balance_calculation/balance_by_date.py --date 2025-11-10
 """
 
 import sys
