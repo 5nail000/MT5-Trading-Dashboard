@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-11-15
+
+### Added
+- **Magic/Group Selection Checkboxes**: Interactive checkboxes to enable/disable display of specific magics/groups in Results and Deals tabs
+- **Show All/Hide All/Refresh Buttons**: Quick controls for managing checkbox selections
+- **Collapsible Checkbox Sections**: Checkbox sections wrapped in `st.expander` for better UI organization
+- **Information Panel on Results Histogram**: Display period, initial balance, total result, and percentage change directly on the chart
+- **Group Details Breakdown**: Individual histograms for each magic group in Results tab when grouped view is enabled
+- **Total P/L Summary**: Summary calculations (Total P/L, Total Positions) for selected magics/groups in both Results and Deals tabs
+- **Alphabetical Sorting**: Magic/group names displayed in alphabetical order within checkboxes
+- **Two-Column Legend Format**: Histogram labels show name and formatted value side-by-side
+- **Independent Filtering**: Separate magic/group selection for Results and Deals tabs
+- **Deals Tab Enhancements**: 
+  - Independent magic/group filtering in "Deals (Aggregated by Position)" table
+  - Filter out incomplete/open positions showing only fully closed positions within selected period
+  - Total P/L and Total Positions summary for filtered data
+  - Real-time filtering that updates table based on checkbox selections
+
+### Changed
+- **Results Histogram Layout**: Increased left margin to 280px for wider two-column legend
+- **Histogram Label Font**: Changed to JetBrains Mono monospace font for better readability and alignment
+- **Content Width**: Expanded overall content area width using custom CSS (max-width: 1400px)
+- **Total Result Formatting**: Added +/- sign before dollar sign (e.g., "+ $1,234.56" instead of "+$1,234.56")
+- **Session State Management**: Improved checkbox state persistence across page reruns using update counters
+- **Balance Calculation**: Enhanced to use full trade history for accurate initial balance calculation
+
+### Fixed
+- **Main Histogram Sorting**: Fixed sorting functionality in Results tab main histogram
+- **Percentage Calculation**: Corrected percentage change calculation to use proper initial balance from full trade history
+- **Incomplete Positions Filtering**: Filter out open/incomplete positions from Deals (Aggregated by Position) table
+- **Infinite Rerun Loop**: Prevented page refresh loop when all checkboxes are cleared
+- **Checkbox State Updates**: Fixed visual updates of checkboxes after Show All/Hide All button clicks
+- **Deprecated Parameters**: Removed deprecated `width='stretch'` parameter from `st.plotly_chart` calls
+- **Data Consistency**: Ensured all calculations use unified dataset (`full_trade_history`) for positions active within selected period
+
+### Technical Details
+- Improved session state management with `update_counter_key` to force widget recreation
+- Added `button_action_key` to prevent session state overwriting during button actions
+- Enhanced data filtering logic to respect selected magics/groups across all views
+- Updated Plotly chart configurations for better label display and spacing
+- Improved error handling for empty checkbox selections
+
 ## [1.1.0] - 2025-10-15
 
 ### Added

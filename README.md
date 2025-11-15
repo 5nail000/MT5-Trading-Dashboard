@@ -12,13 +12,18 @@ A comprehensive trading dashboard for MetaTrader 5 with modular architecture, bu
 - **Auto-refresh**: Keep data up-to-date automatically
 - **Multi-tab Interface**: Organized view of different trading aspects
 - **Performance Tracking**: Monitor profit/loss with customizable thresholds
+- **Magic/Group Selection**: Filter and display specific magics/groups with interactive checkboxes
+- **Group Details Breakdown**: View individual histograms for each magic group
+- **Information Panel**: Display period, balance, and performance metrics directly on charts
+- **Advanced Filtering**: Filter out incomplete positions and customize data views
 
 ## 📊 Dashboard Tabs
 
 1. **Open Positions**: Current floating P/L by magic numbers
-2. **Results**: Historical trading results and performance
-3. **Distribution**: Profit/loss distribution analysis
-4. **Deals by Hour**: Trading activity timeline
+2. **Results**: Historical trading results and performance with magic/group filtering, information panel, and group details breakdown
+3. **Deals (Aggregated by Position)**: Detailed table of closed positions with independent magic/group filtering, showing only fully closed positions within selected period
+4. **Distribution**: Profit/loss distribution analysis
+5. **Deals by Hour**: Trading activity timeline
 
 ## 🏗️ Project Structure
 
@@ -283,7 +288,21 @@ If you encounter any issues:
 
 ## 🔄 Version History
 
-- **v1.0.0**: Initial release with bug fixes
+- **v1.2.0** (2025-11-15): Major UI improvements and feature enhancements
+  - Added magic/group selection checkboxes with Show All/Hide All/Refresh buttons
+  - Added information panel on Results histogram
+  - Added group details breakdown in Results tab
+  - Enhanced Deals tab with independent filtering and incomplete positions filtering
+  - Improved filtering and sorting functionality
+  - Enhanced balance calculation accuracy
+  - Improved content width and histogram label formatting
+
+- **v1.1.0** (2025-10-15): Dynamic balance calculation
+  - Added `calculate_balance_at_date()` function
+  - Timezone support and beginning/end of day options
+  - Command line tool for balance calculations
+
+- **v1.0.0** (2025-10-14): Initial release with bug fixes
   - Fixed all import and runtime errors
   - Implemented modular architecture
   - Added comprehensive error handling
