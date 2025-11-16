@@ -258,15 +258,41 @@ class AccountInfoComponent:
     
     @staticmethod
     def render(account_info: Any, account_id: str, db_manager: Any):
-        """Render account number and title"""
+        """Render account number, title, leverage and server"""
         account_number = account_info.login if account_info else account_id
         account_title = db_manager.get_account_title(account_id) or "No Title"
         
-        col1, col2 = st.columns(2)
+        # Получаем leverage и server из БД или из account_info
+        leverage = db_manager.get_account_leverage(account_id)
+        server = db_manager.get_account_server(account_id)
+        
+        # Если есть account_info, обновляем данные в БД
+        if account_info:
+            # Получаем leverage и server из MT5
+            mt5_leverage = getattr(account_info, 'leverage', None)
+            mt5_server = getattr(account_info, 'server', None)
+            
+            # Сохраняем в БД, если они есть и отличаются от сохраненных
+            if mt5_leverage is not None and mt5_leverage != leverage:
+                db_manager.set_account_leverage(account_id, mt5_leverage)
+                leverage = mt5_leverage
+            
+            if mt5_server is not None and mt5_server != server:
+                db_manager.set_account_server(account_id, mt5_server)
+                server = mt5_server
+        
+        # Display Account Title large at the top (centered)
+        st.markdown(f"<h1 style='text-align: center;'>{account_title}</h1><br>", unsafe_allow_html=True)
+        
+        # Display other account info below
+        col1, col2, col3 = st.columns(3)
         with col1:
             st.write(f"**Account Number:** {account_number}")
         with col2:
-            st.write(f"**Account Title:** {account_title}")
+            leverage_str = f"1:{leverage}" if leverage else "N/A"
+            st.write(f"**Leverage:** {leverage_str}")
+        with col3:
+            st.write(f"**Server:** {server or 'N/A'}")
 
 
 class OpenPositionsDashboardComponent:

@@ -56,6 +56,9 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 
+# Tick data directory
+ticks_data/
+
 # Logs
 *.log
 

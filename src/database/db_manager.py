@@ -24,12 +24,24 @@ class DatabaseManager:
             conn.close()
     
     def init_database(self):
-        """Initialize database tables"""
+        """Initialize database tables and migrate if needed"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             # Initialize all tables
             for table_name, table_config in DatabaseConfig.TABLES.items():
                 cursor.execute(table_config["schema"])
+            
+            # Migrate account_settings table if needed (add leverage and server columns)
+            try:
+                cursor.execute("ALTER TABLE account_settings ADD COLUMN leverage INTEGER")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+            
+            try:
+                cursor.execute("ALTER TABLE account_settings ADD COLUMN server TEXT")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+            
             conn.commit()
     
     def get_magic_description(self, account: str, magic: int) -> Optional[str]:
@@ -85,14 +97,67 @@ class DatabaseManager:
             return result[0] if result else None
     
     def set_account_title(self, account_id: str, title: str):
-        """Set account title"""
+        """Set account title (preserves leverage and server)"""
+        self.set_account_settings(account_id, title=title)
+    
+    def get_account_settings(self, account_id: str) -> Dict[str, Any]:
+        """Get all account settings (title, leverage, server)"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT OR REPLACE INTO account_settings (account_id, account_title) VALUES (?, ?)",
-                (account_id, title)
+                "SELECT account_title, leverage, server FROM account_settings WHERE account_id=?",
+                (account_id,)
+            )
+            result = cursor.fetchone()
+            if result:
+                return {
+                    "account_title": result[0],
+                    "leverage": result[1],
+                    "server": result[2]
+                }
+            return {
+                "account_title": None,
+                "leverage": None,
+                "server": None
+            }
+    
+    def set_account_settings(self, account_id: str, title: str = None, 
+                           leverage: int = None, server: str = None):
+        """Set account settings (title, leverage, server)"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            # Получаем текущие значения
+            current = self.get_account_settings(account_id)
+            
+            # Используем переданные значения или текущие
+            final_title = title if title is not None else current.get("account_title")
+            final_leverage = leverage if leverage is not None else current.get("leverage")
+            final_server = server if server is not None else current.get("server")
+            
+            cursor.execute(
+                """INSERT OR REPLACE INTO account_settings 
+                   (account_id, account_title, leverage, server) VALUES (?, ?, ?, ?)""",
+                (account_id, final_title, final_leverage, final_server)
             )
             conn.commit()
+    
+    def get_account_leverage(self, account_id: str) -> Optional[int]:
+        """Get account leverage"""
+        settings = self.get_account_settings(account_id)
+        return settings.get("leverage")
+    
+    def set_account_leverage(self, account_id: str, leverage: int):
+        """Set account leverage"""
+        self.set_account_settings(account_id, leverage=leverage)
+    
+    def get_account_server(self, account_id: str) -> Optional[str]:
+        """Get account server"""
+        settings = self.get_account_settings(account_id)
+        return settings.get("server")
+    
+    def set_account_server(self, account_id: str, server: str):
+        """Set account server"""
+        self.set_account_settings(account_id, server=server)
     
     def create_magic_group(self, account_id: str, group_name: str) -> int:
         """Create a new magic group and return its ID"""

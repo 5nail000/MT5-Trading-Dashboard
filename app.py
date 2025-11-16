@@ -41,35 +41,29 @@ def main():
     # Initialize session state
     session_utils.init_session_state(st.session_state)
     
-    # Application title
-    st.title(config.APP_NAME)
+    # Load open positions early for dashboard (before displaying account info)
+    if 'open_profits' not in st.session_state:
+        load_open_positions(st.session_state)
     
     # Get account info for display
     account_info = None
     account_id = "default"
     
-    # Try to get account info from open positions or history
+    # Try to get account info from session state (after loading)
     if 'account_info_open' in st.session_state:
         account_info = st.session_state.account_info_open
         account_id = str(account_info.login) if account_info else "default"
     elif 'account_id' in st.session_state:
         account_id = st.session_state.account_id
     
-    # Display Account Number and Account Title
-    if account_info or account_id != "default":
-        account_info_component.render(account_info, account_id, db_manager)
+    # Application title (smaller, below account info)
+    st.markdown(f"<h3 style='margin-top: 0.5rem; text-align: center;'>{config.APP_NAME}</h3>", unsafe_allow_html=True)
+    
+    # Display Account Title (large, at top) and other account info
+    # Always render if we have account_id (even if it's "default", to show "No Title")
+    account_info_component.render(account_info, account_id, db_manager)
     
     st.divider()
-    
-    # Load open positions early for dashboard
-    if 'open_profits' not in st.session_state:
-        load_open_positions(st.session_state)
-    
-    # Update account_id from loaded positions
-    if 'account_id' in st.session_state:
-        account_id = st.session_state.account_id
-        if 'account_info_open' in st.session_state:
-            account_info = st.session_state.account_info_open
     
     # 1. Open Positions Dashboard (collapsible)
     if 'open_profits' in st.session_state:

@@ -278,6 +278,282 @@ class MT5Calculator:
         magic_profits["Total by Magic"] = magic_total_sums
         
         return magic_profits
+    
+    @staticmethod
+    def get_positions_timeline(from_date: datetime, to_date: datetime, 
+                               magics: List[int], deals: List,
+                               account: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+        """
+        Получает серию временных промежутков с пулом позиций
+        
+        Args:
+            from_date: Время начала среза (IN)
+            to_date: Время конца среза (OUT)
+            magics: Список мэджиков для фильтрации
+            deals: Список всех сделок из истории (должен включать период до from_date)
+            account: Информация об аккаунте (опционально, для получения баланса)
+            
+        Returns:
+            Список словарей, каждый содержит:
+            - 'positions': список позиций (каждая с symbol, direction, volume, price_open, magic)
+            - 'time_in': время начала промежутка
+            - 'time_out': время конца промежутка
+            - 'balance': баланс на начало промежутка
+                * Для первого промежутка баланс рассчитывается через calculate_balance_at_date
+                * Для последующих промежутков баланс накапливается: начальный + все изменения
+                  (SWAP, комиссии, прибыль при закрытии позиций)
+                * При закрытии позиции учитывается двойная комиссия (открытие + закрытие)
+        """
+        # Конвертируем даты в UTC timestamp
+        from_date_utc = from_date - timedelta(hours=Config.LOCAL_TIMESHIFT)
+        to_date_utc = to_date - timedelta(hours=Config.LOCAL_TIMESHIFT)
+        from_timestamp = from_date_utc.timestamp()
+        to_timestamp = to_date_utc.timestamp()
+        
+        # Фильтруем сделки (исключаем изменения баланса)
+        trading_deals = [d for d in deals if d.type != 2]
+        
+        # Создаем маппинг position_id -> magic (для связи позиций с нулевым мэджиком)
+        position_id_to_magic = {}
+        for deal in trading_deals:
+            if deal.position_id != 0 and deal.magic != 0:
+                position_id_to_magic[deal.position_id] = deal.magic
+        
+        # Находим релевантные position_id (позиции с нужными мэджиками)
+        relevant_position_ids = set()
+        for deal in trading_deals:
+            deal_magic = deal.magic
+            position_id = deal.position_id
+            
+            # Определяем мэджик позиции
+            if deal_magic in magics:
+                relevant_position_ids.add(position_id)
+            elif position_id != 0 and position_id in position_id_to_magic:
+                if position_id_to_magic[position_id] in magics:
+                    relevant_position_ids.add(position_id)
+        
+        # Получаем ВСЕ сделки для релевантных позиций (включая открытие до from_date)
+        all_relevant_deals = []
+        for deal in trading_deals:
+            if deal.position_id in relevant_position_ids:
+                all_relevant_deals.append(deal)
+        
+        # Сортируем сделки по времени и deal номеру
+        all_relevant_deals.sort(key=lambda x: (x.time, x.deal if hasattr(x, 'deal') else 0))
+        
+        # Восстанавливаем состояние позиций на начало периода
+        # Позиция считается открытой, если есть сделки открытия до from_timestamp
+        # и нет сделок закрытия до from_timestamp
+        positions_at_start = {}  # position_id -> позиция
+        
+        for deal in all_relevant_deals:
+            if deal.time >= from_timestamp:
+                break
+            
+            position_id = deal.position_id
+            if position_id == 0:
+                continue
+            
+            entry = deal.entry  # 0 = in (открытие), 1 = out (закрытие)
+            
+            if entry == 0:  # Сделка открытия
+                if position_id not in positions_at_start:
+                    # Определяем мэджик для позиции
+                    magic = deal.magic
+                    if magic == 0 and position_id in position_id_to_magic:
+                        magic = position_id_to_magic[position_id]
+                    
+                    positions_at_start[position_id] = {
+                        'position_id': position_id,
+                        'symbol': deal.symbol,
+                        'direction': 'Buy' if deal.type == 0 else 'Sell',
+                        'volume': abs(deal.volume),
+                        'price_open': deal.price,
+                        'magic': magic,
+                        'total_volume': abs(deal.volume),
+                        'total_price_volume': deal.price * abs(deal.volume)  # Для расчета средней цены
+                    }
+                else:
+                    # Добавляем объем к существующей позиции
+                    pos = positions_at_start[position_id]
+                    pos['total_volume'] += abs(deal.volume)
+                    pos['total_price_volume'] += deal.price * abs(deal.volume)
+                    pos['price_open'] = pos['total_price_volume'] / pos['total_volume']
+            elif entry == 1:  # Сделка закрытия
+                if position_id in positions_at_start:
+                    # Уменьшаем объем или удаляем позицию
+                    close_volume = abs(deal.volume)
+                    pos = positions_at_start[position_id]
+                    pos['total_volume'] -= close_volume
+                    if pos['total_volume'] <= 0:
+                        del positions_at_start[position_id]
+                    else:
+                        # Пересчитываем среднюю цену (упрощенно, без учета закрытого объема)
+                        # В реальности нужно учитывать FIFO или другую логику
+                        pass
+        
+        # Теперь проходим по сделкам в периоде и отслеживаем изменения
+        timeline = []
+        current_positions = {}
+        for pid, pos in positions_at_start.items():
+            current_positions[pid] = {
+                'position_id': pos['position_id'],
+                'symbol': pos['symbol'],
+                'direction': pos['direction'],
+                'volume': pos['total_volume'],
+                'price_open': pos['price_open'],
+                'magic': pos['magic'],
+                'total_volume': pos['total_volume'],
+                'total_price_volume': pos['total_price_volume']
+            }
+        
+        # Добавляем начальное состояние
+        # Баланс для первого промежутка рассчитывается через calculate_balance_at_date
+        initial_balance = MT5Calculator.calculate_balance_at_date(
+            from_date, deals, use_exact_time=True
+        )
+        
+        timeline.append({
+            'positions': [{
+                'symbol': pos['symbol'],
+                'direction': pos['direction'],
+                'volume': pos['total_volume'],
+                'price_open': pos['price_open'],
+                'magic': pos['magic']
+            } for pos in current_positions.values()],
+            'time_in': from_date,
+            'time_out': None,  # Будет установлено при следующем изменении
+            'balance': initial_balance
+        })
+        
+        # Текущий баланс для накопления изменений
+        current_balance = initial_balance
+        
+        # Обрабатываем сделки в периоде
+        for deal in all_relevant_deals:
+            if deal.time < from_timestamp:
+                continue
+            if deal.time > to_timestamp:
+                break
+            
+            position_id = deal.position_id
+            if position_id == 0:
+                continue
+            
+            entry = deal.entry
+            deal_time_local = datetime.fromtimestamp(deal.time) - timedelta(hours=Config.LOCAL_TIMESHIFT)
+            positions_changed = False
+            balance_change = 0.0  # Изменение баланса от этой сделки
+            
+            if entry == 0:  # Сделка открытия
+                if position_id not in current_positions:
+                    # Новая позиция
+                    magic = deal.magic
+                    if magic == 0 and position_id in position_id_to_magic:
+                        magic = position_id_to_magic[position_id]
+                    
+                    current_positions[position_id] = {
+                        'position_id': position_id,
+                        'symbol': deal.symbol,
+                        'direction': 'Buy' if deal.type == 0 else 'Sell',
+                        'volume': abs(deal.volume),
+                        'price_open': deal.price,
+                        'magic': magic,
+                        'total_volume': abs(deal.volume),
+                        'total_price_volume': deal.price * abs(deal.volume)
+                    }
+                    positions_changed = True
+                else:
+                    # Добавляем объем к существующей позиции
+                    pos = current_positions[position_id]
+                    new_volume = abs(deal.volume)
+                    pos['total_volume'] += new_volume
+                    pos['total_price_volume'] += deal.price * new_volume
+                    pos['price_open'] = pos['total_price_volume'] / pos['total_volume']
+                    pos['volume'] = pos['total_volume']
+                    positions_changed = True
+                
+                # При открытии учитываем только SWAP (если есть)
+                # Комиссия за открытие будет учтена при закрытии
+                balance_change = deal.swap if hasattr(deal, 'swap') else 0.0
+            
+            elif entry == 1:  # Сделка закрытия или SWAP
+                close_volume = abs(deal.volume)
+                
+                if position_id in current_positions:
+                    # Позиция существует - это может быть закрытие или SWAP
+                    pos = current_positions[position_id]
+                    
+                    if close_volume > 0:
+                        # Это закрытие позиции (полное или частичное)
+                        pos['total_volume'] -= close_volume
+                        
+                        if pos['total_volume'] <= 0:
+                            # Позиция полностью закрыта
+                            del current_positions[position_id]
+                            positions_changed = True
+                        else:
+                            # Позиция частично закрыта
+                            pos['volume'] = pos['total_volume']
+                            positions_changed = True
+                    
+                    # При закрытии учитываем:
+                    # - Прибыль/убыток (profit)
+                    # - SWAP
+                    # - Двойную комиссию (открытие + закрытие), только если это реальное закрытие
+                    profit = deal.profit if hasattr(deal, 'profit') else 0.0
+                    swap = deal.swap if hasattr(deal, 'swap') else 0.0
+                    commission = deal.commission if hasattr(deal, 'commission') else 0.0
+                    
+                    if close_volume > 0:
+                        # Реальное закрытие - двойная комиссия
+                        balance_change = profit + swap + (commission * 2)
+                    else:
+                        # Только SWAP-сделка (volume=0 или очень маленький)
+                        balance_change = swap
+                else:
+                    # Позиция уже закрыта ранее, но есть SWAP или другая сделка
+                    # Учитываем только SWAP (комиссия и profit уже были учтены при закрытии)
+                    swap = deal.swap if hasattr(deal, 'swap') else 0.0
+                    balance_change = swap
+            
+            # Примечание: В MT5 SWAP обычно включается в сделку закрытия (entry=1)
+            # Отдельные SWAP-сделки для открытых позиций также имеют entry=1,
+            # но они обрабатываются выше в блоке закрытия
+            
+            # Накапливаем изменение баланса
+            current_balance += balance_change
+            
+            # Если пул позиций изменился, создаем новый элемент в timeline
+            if positions_changed:
+                # Закрываем предыдущий промежуток
+                if timeline:
+                    timeline[-1]['time_out'] = deal_time_local
+                
+                # Для последующих промежутков используем накопленный баланс
+                # Добавляем новый промежуток
+                timeline.append({
+                    'positions': [{
+                        'symbol': pos['symbol'],
+                        'direction': pos['direction'],
+                        'volume': pos['total_volume'],
+                        'price_open': pos['price_open'],
+                        'magic': pos['magic']
+                    } for pos in current_positions.values()],
+                    'time_in': deal_time_local,
+                    'time_out': None,  # Будет установлено при следующем изменении
+                    'balance': current_balance
+                })
+            # Если пул не изменился, но баланс изменился (например, SWAP),
+            # обновляем баланс в последнем промежутке
+            elif balance_change != 0 and timeline:
+                timeline[-1]['balance'] = current_balance
+        
+        # Закрываем последний промежуток
+        if timeline:
+            timeline[-1]['time_out'] = to_date
+        
+        return timeline
 
 
 # Global instances

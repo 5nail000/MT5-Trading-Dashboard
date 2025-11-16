@@ -140,7 +140,7 @@ class DatabaseConfig:
             "name": "account_settings",
             "schema": """
                 CREATE TABLE IF NOT EXISTS account_settings
-                (account_id TEXT PRIMARY KEY, account_title TEXT)
+                (account_id TEXT PRIMARY KEY, account_title TEXT, leverage INTEGER, server TEXT)
             """
         },
         "magic_groups": {
